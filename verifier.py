@@ -14,20 +14,20 @@ def verify(curr_model, test_x, test_y, h, g, alpha=0.001):
 
     Return: None
     """
-    # pull the x and y values that belong to g
-    indices = test_x.apply(g, axis=1) == 1
+    #pull the x and y values that belong to g
+    indices = g(test_x)
     xs = test_x[indices]
     ys = test_y[indices]
 
-    # get predicted ys from current model and proposed h
-    curr_model_preds = xs.apply(curr_model.predict, axis=1)
+    #get predicted ys from current model and proposed h
+    curr_model_preds = np.array(curr_model.predict(xs),dtype=bool)
     h_preds = h(xs)
 
-    # measure the error of current model and proposed h
+    #measure the error of current model and proposed h
     curr_model_error = metrics.zero_one_loss(ys, curr_model_preds)
     h_error = metrics.zero_one_loss(ys, h_preds)
 
-    # determine if (g,h) should be accepted or not
+    #determine if (g,h) should be accepted or not
     group_weight = sum(indices) / float(len(test_x))
     improvement = curr_model_error - h_error
 
@@ -49,16 +49,16 @@ def is_proposed_group_good(curr_model, test_x, test_y, h, g):
 
     Return: None
     """
-    # pull the x and y values that belong to g
-    indices = test_x.apply(g, axis=1) == 1
+    #pull the x and y values that belong to g
+    indices = g(test_x)
     xs = test_x[indices]
     ys = test_y[indices]
 
-    # get predicted ys from current model and proposed h
-    curr_model_preds = xs.apply(curr_model.predict, axis=1)
+    #get predicted ys from current model and proposed h
+    curr_model_preds = np.array(curr_model.predict(xs),dtype=bool)
     h_preds = h(xs)
 
-    # measure the error of current model and proposed h
+    #measure the error of current model and proposed h
     curr_model_error = metrics.zero_one_loss(ys, curr_model_preds)
     h_error = metrics.zero_one_loss(ys, h_preds)
 
@@ -85,19 +85,16 @@ def is_proposed_group_good_csc(curr_model, test_x, test_y, h, g):
     Return: None
     """
     # pull the x and y values that belong to g
-    indices = test_x.apply(g, axis=1) == 1
+    indices = g(test_x)
     xs = test_x[indices]
     ys = test_y[indices]
 
     # get predicted ys from current model and proposed h
-    curr_model_preds = xs.apply(curr_model.predict, axis=1)
+    curr_model_preds = np.array(curr_model.predict(xs),dtype=bool)
 
     # reshaping to mesh with how h takes inputs
-    def _h(x):
-        _x = np.array(x).reshape(1, -1)
-        return h(_x)[0]
 
-    h_preds = xs.apply(_h, axis=1)
+    h_preds = h(xs)
 
     # measure the error of current model and proposed h
     curr_model_error = metrics.zero_one_loss(ys, curr_model_preds)
@@ -115,7 +112,7 @@ def is_proposed_group_good_csc(curr_model, test_x, test_y, h, g):
 
 def check_group_sizes(test_x, group):
     # Returns True if the group has more than 0 elements in test_x
-    indices = test_x.apply(group, axis=1) == 1
+    indices = group(test_x)
     if sum(indices) >= 1:
         return True
     else:

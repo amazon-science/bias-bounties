@@ -29,12 +29,12 @@ def measure_group_errors(model, X, y):
     X: n x m dataframe of test data
     y: dataframe of n true labels (or optimal predictions) of points in X
     """
-    indices = [X.apply(g, axis=1) == 1 for g in model.predicates]
+    indices = [g(X) == 1 for g in model.predicates]
     xs = [X[i] for i in indices]
     ys = [y[i] for i in indices]
     group_errors = []
     for i in range(len(model.predicates)):
-        pred_ys = xs[i].apply(model.predict, axis=1)
+        pred_ys = np.array(model.predict(xs[i]),dtype = bool)
         group_errors.append(metrics.zero_one_loss(ys[i], pred_ys))
     return group_errors
 
@@ -43,12 +43,12 @@ def measure_all_group_errors(model, groups, X, y):
     """
     Function to measure group errors over any predefined groups for algorithm analysis
     """
-    indices = [X.apply(g, axis=1) == 1 for g in groups]
+    indices = [g(X) == 1 for g in groups]
     xs = [X[i] for i in indices]
     ys = [y[i] for i in indices]
     group_errors = []
     for i in range(len(groups)):
-        pred_ys = xs[i].apply(model.predict, axis=1)
+        pred_ys = np.array(model.predict(xs[i]),dtype = bool)
         group_errors.append(metrics.zero_one_loss(ys[i], pred_ys))
     return group_errors
 
@@ -57,7 +57,7 @@ def get_group_weights(model, X):
     """
     Helper function that returns the list of group weight in the dataset X
     """
-    indices = [X.apply(g, axis=1) == 1 for g in model.predicates]
+    indices = [g(X) == 1 for g in model.predicates]
     xs = [X[i] for i in indices]
     weights = [len(xs[i]) / float(len(X)) for i in range(len(xs))]
 

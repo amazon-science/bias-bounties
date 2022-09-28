@@ -14,7 +14,7 @@ import verifier
 # building the bounty hunters' models_to_update
 def bounty_hunter_models(x, y, group_functions, dt_depth, classifier):
     # learn the indices first, since this is an inefficient operation
-    indices = [x.apply(g, axis=1) == 1 for g in group_functions]
+    indices = [g(x) for g in group_functions]
     # then pull the particular rows from the dataframe
     training_xs = [x[i] for i in indices]
     training_ys = [y[i] for i in indices]
@@ -37,9 +37,9 @@ def run_updates(initial_model, group_functions, models, group_indicators, test_x
     # stick the gs and hs into a form that the updater accepts
     bounty_hunters = [[group_functions[i], models[i], group_indicators[i]] for i in range(len(group_functions))]
 
-    all_groups = [lambda x: 1] + group_functions
+    all_groups = [lambda x: np.ones(len(x),dtype=bool)] + group_functions
     print("Building initial model")
-    # build the initial model 
+    # build the initial model
     f = model.PointerDecisionList(initial_model.predict, all_groups)
 
     f.test_errors[0] = updater.measure_all_group_errors(f, all_groups, test_x, test_y)
