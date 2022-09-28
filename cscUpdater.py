@@ -55,14 +55,11 @@ def g_gen(r0, r1):
     """
 
     def g(x):
-        x = np.array(x).reshape(1, -1)
         cost0 = r0.predict(x)
         cost1 = r1.predict(x)
-        if cost0 < 0 or cost1 < 0:
-            return 1
-        else:
-            return 0
-
+        truth_series_0 = (cost0 < 0)
+        truth_series_1 = (cost1 < 0)
+        return np.logical_or(truth_series_0,truth_series_1)
     return g
 
 
@@ -78,11 +75,7 @@ def h_gen(r0, r1):
     def h(x):
         cost0 = r0.predict(x)
         cost1 = r1.predict(x)
-        if cost0 < cost1:
-            return [False]  # have to stick these in brackets to match syntax of sklearn prediction functions
-        else:
-            return [True]
-
+        return (cost0 > cost1)
     return h
 
 
@@ -93,6 +86,16 @@ def h_gen(r0, r1):
 ##################################################################################################
 
 # noinspection SpellCheckingInspection
+def get_group_weights(model, X):
+    """
+    Helper function that returns the list of group weight in the dataset X
+    """
+    indices = [g(X) == 1 for g in model.predicates]
+    xs = [X[i] for i in indices]
+    weights = [len(xs[i]) / float(len(X)) for i in range(len(xs))]
+
+    return weights
+
 def measure_group_errors(model, X, y):
     """
     Helper function that measures the group errors of groups defined in model over test data X with true
@@ -103,12 +106,12 @@ def measure_group_errors(model, X, y):
     X: n x m dataframe of test data
     y: dataframe of n true labels (or optimal predictions) of points in X
     """
-    indices = [X.apply(g, axis=1) == 1 for g in model.predicates]
+    indices = [g(X) == 1 for g in model.predicates]
     xs = [X[i] for i in indices]
     ys = [y[i] for i in indices]
     group_errors = []
     for i in range(len(model.predicates)):
-        pred_ys = xs[i].apply(model.predict, axis=1)
+        pred_ys = np.array(model.predict(xs[i]),dtype = bool)
         group_errors.append(metrics.zero_one_loss(np.array(ys[i]), np.array(pred_ys)))
     return group_errors
 
@@ -119,11 +122,10 @@ def measure_group_error(model, group, X, y):
     Function to measure group errors of a specific group. This will return an error if you pass in a group that
      has size zero over X
     """
-
-    indices = X.apply(group, axis=1) == 1
+    indices = group(X)
     xs = X[indices]
     ys = y[indices]
-    pred_ys = xs.apply(model.predict, axis=1).to_numpy()
+    pred_ys = np.array(model.predict(xs),dtype = bool)
     group_errors = metrics.zero_one_loss(ys, pred_ys)
 
     return group_errors
@@ -201,7 +203,7 @@ def find_next_problem_node(curr_model, new_errors):
 
 
 # noinspection SpellCheckingInspection
-def iterative_update(curr_model, h_t, g_t, train_X, train_y, test_X, test_y, group_name):
+def iterative_update(curr_model, h_t, g_t, train_X, train_y, test_X, test_y, group_name, vis=False):
     """
     Updates the curr_model to incorporate (g_t, h_t) in a way that preserves group error
     monotonicity over the sample data X with labels y
@@ -225,7 +227,6 @@ def iterative_update(curr_model, h_t, g_t, train_X, train_y, test_X, test_y, gro
 
     # measure new group errors and compare to old
     new_errors = measure_group_errors(curr_model, test_X, test_y)
-
     # recursively check for new errors
 
     [problem_node_index, problem_node_model_index] = find_next_problem_node(curr_model, new_errors)
@@ -248,7 +249,6 @@ def iterative_update(curr_model, h_t, g_t, train_X, train_y, test_X, test_y, gro
             new_errors = measure_group_errors(curr_model, test_X, test_y)
             # check for further/new problem nodes
             [problem_node_index, problem_node_model_index] = find_next_problem_node(curr_model, new_errors)
-
     if new_errors is None:
         curr_model.pop()  # remove the new model from the head of the pDL
         return "Could not calculate all group errors and cannot update"
@@ -258,5 +258,21 @@ def iterative_update(curr_model, h_t, g_t, train_X, train_y, test_X, test_y, gro
 
     curr_model.train_errors.append(measure_group_errors(curr_model, train_X, train_y))
     curr_model.test_errors.append(measure_group_errors(curr_model, test_X, test_y))
+
+    if vis:
+        print("Running iterative update for group: " + group_name)
+        print("Model groups prior to update: ")
+        print(curr_model.pred_names[:-1])
+        print("Group errors on test set prior to update (over all groups)")
+        print(curr_model.test_errors[curr_model.num_rounds - 1])
+        print("Group errors after new group has been prepended to PDL:")
+        print(curr_model.test_errors[len(curr_model.test_errors)-1])
+        print("Group Weights:")
+        print(get_group_weights(curr_model, test_X))
+        if len(problem_node_tracking) > 0:
+            print("Repaired Nodes:")
+            print(problem_node_tracking)
+        else:
+            print("No repairs needed.")
 
     return [curr_model.train_errors, curr_model.test_errors]
